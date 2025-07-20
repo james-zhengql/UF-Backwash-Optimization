@@ -6,10 +6,11 @@ import numpy as np
 from datetime import datetime
 import uuid
 
-from models.prediction_model import PredictionModel
-from models.database import get_db, PredictionRecord
-from schemas.prediction import PredictionRequest, PredictionResponse, BackwashPoint
-from utils.validators import validate_parameters
+# Fix import paths
+from backend.models.prediction_model import PredictionModel
+from backend.models.database import get_db, PredictionRecord
+from backend.schemas.prediction import PredictionRequest, PredictionResponse, BackwashPoint
+from backend.utils.validators import validate_parameters
 
 app = FastAPI(
     title="Intelligent UF Backwash API",
@@ -56,7 +57,7 @@ async def predict_backwash(request: PredictionRequest):
     """Predict pressure drop and backwash requirements"""
     try:
         # Validate input parameters
-        validation_result = validate_parameters(request.parameters)
+        validation_result = validate_parameters(request.parameters.dict())
         if not validation_result["valid"]:
             raise HTTPException(status_code=400, detail=validation_result["error"])
         
