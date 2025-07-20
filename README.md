@@ -52,7 +52,7 @@ A comprehensive web application for predicting pressure drop and backwash requir
 
 1. **Create virtual environment**
    ```bash
-   python -m venv venv
+   python -m venv 450env
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
@@ -183,6 +183,146 @@ intelligent-uf-backwash/
 | `HOST` | `0.0.0.0` | Server host |
 | `PORT` | `8000` | Backend port |
 | `RELOAD` | `true` | Enable auto-reload |
+
+## 🗄️ Database Management
+
+### Database Overview
+
+The system uses SQLite database (`uf_backwash.db`) to store:
+- **Prediction Records**: Historical prediction data and results
+- **System Configuration**: System settings and parameters
+- **User Sessions**: User interaction data
+
+### Database Schema
+
+#### Prediction Records Table
+```sql
+CREATE TABLE prediction_records (
+    id INTEGER PRIMARY KEY,
+    timestamp DATETIME,
+    turbidity FLOAT NOT NULL,
+    ph FLOAT NOT NULL,
+    temperature FLOAT NOT NULL,
+    flow_rate FLOAT NOT NULL,
+    inlet_pressure FLOAT NOT NULL,
+    fouling_status VARCHAR NOT NULL,
+    time_steps INTEGER,
+    pressure_threshold FLOAT,
+    pressure_data JSON NOT NULL,
+    backwash_points JSON,
+    fouling_rate FLOAT NOT NULL,
+    efficiency FLOAT NOT NULL,
+    recommendations JSON,
+    confidence_score FLOAT NOT NULL,
+    model_version VARCHAR,
+    prediction_accuracy FLOAT
+);
+```
+
+### Database Operations
+
+#### View Database Contents
+
+**Method 1: SQLite Command Line**
+```bash
+# Connect to database
+sqlite3 uf_backwash.db
+
+# View all tables
+.tables
+
+# View table structure
+.schema prediction_records
+
+# View recent predictions
+SELECT id, timestamp, turbidity, ph, temperature, fouling_rate, efficiency 
+FROM prediction_records 
+ORDER BY timestamp DESC 
+LIMIT 10;
+
+# Count total records
+SELECT COUNT(*) FROM prediction_records;
+
+# Exit SQLite
+.quit
+```
+
+**Method 2: Python Script**
+```bash
+# Use the provided database viewer
+python3 view_database.py
+```
+
+**Method 3: Direct SQL Commands**
+```bash
+# View table structure
+sqlite3 uf_backwash.db ".schema prediction_records"
+
+# Count records
+sqlite3 uf_backwash.db "SELECT COUNT(*) FROM prediction_records;"
+
+# View recent data
+sqlite3 uf_backwash.db "SELECT * FROM prediction_records ORDER BY timestamp DESC LIMIT 5;"
+```
+
+#### Database Backup and Restore
+
+**Backup Database**
+```bash
+# Create backup
+cp uf_backwash.db uf_backwash_backup_$(date +%Y%m%d_%H%M%S).db
+
+# Or use SQLite backup
+sqlite3 uf_backwash.db ".backup backup.db"
+```
+
+**Restore Database**
+```bash
+# Restore from backup
+cp backup.db uf_backwash.db
+```
+
+#### Database Maintenance
+
+**Clean Old Records**
+```bash
+# Delete records older than 30 days
+sqlite3 uf_backwash.db "DELETE FROM prediction_records WHERE timestamp < datetime('now', '-30 days');"
+
+# Vacuum database to reclaim space
+sqlite3 uf_backwash.db "VACUUM;"
+```
+
+**Reset Database**
+```bash
+# Remove database file (will be recreated on next startup)
+rm uf_backwash.db
+```
+
+### Database Monitoring
+
+#### Check Database Health
+```bash
+# Check database integrity
+sqlite3 uf_backwash.db "PRAGMA integrity_check;"
+
+# Check database size
+ls -lh uf_backwash.db
+
+# View database statistics
+sqlite3 uf_backwash.db "SELECT COUNT(*) as total_records, 
+                               MIN(timestamp) as oldest_record,
+                               MAX(timestamp) as newest_record
+                        FROM prediction_records;"
+```
+
+#### Performance Monitoring
+```bash
+# Enable performance monitoring
+sqlite3 uf_backwash.db "PRAGMA journal_mode=WAL;"
+sqlite3 uf_backwash.db "PRAGMA synchronous=NORMAL;"
+sqlite3 uf_backwash.db "PRAGMA cache_size=10000;"
+```
 
 ### Parameter Ranges
 

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Intelligent UF backwash</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+  <style>
+    body {
+      background-color: #f8f9fa;
+      padding: 20px;
+    }
+    .input-container {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      margin: 20px 0;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .chart-container {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      margin: 20px 0;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      height: 500px; /* 固定高度 */
+      position: relative;
+    }
+    .chart-wrapper {
+      height: 400px; /* 图表包装器固定高度 */
+      position: relative;
+    }
+    #pressureChart {
+      width: 100% !important;
+      height: 100% !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="text-center mb-4">Intelligent UF Backwash</h1>
+    
+    <div class="input-container">
+      <div class="row justify-content-center align-items-center">
+        <div class="col-md-2">
+          <div class="input-group">
+            <span class="input-group-text">pH</span>
+            <input type="number" class="form-control" id="ph-input" step="0.1" value="7.0">
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="input-group">
+            <span class="input-group-text">Temp</span>
+            <input type="number" class="form-control" id="temp-input" step="0.1" value="25.0">
+            <span class="input-group-text">°C</span>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="input-group">
+            <span class="input-group-text">Turb</span>
+            <input type="number" class="form-control" id="turb-input" step="0.1" value="0.5">
+            <span class="input-group-text">NTU</span>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="input-group">
+            <span class="input-group-text">Flow</span>
+            <input type="number" class="form-control" id="flow-input" step="0.1" value="20">
+            <span class="input-group-text">GPM</span>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="input-group">
+            <span class="input-group-text">P<sub>in</sub></span>
+            <input type="number" class="form-control" id="inlet-pressure-input" step="0.1" value="40">
+            <span class="input-group-text">PSIG</span>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <button class="btn btn-primary w-100" id="forecast-btn">Forecast</button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="chart-container" id="chart-section" style="display: none;">
+      <h4 class="text-center mb-3">Pressure Drop Prediction</h4>
+      <div class="chart-wrapper">
+        <canvas id="pressureChart"></canvas>
+      </div>
+    </div>
+    
+    <div id="result"></div>
+  </div>
+
+  <script>
+    // Global chart instance
+    let pressureChart = null;
+    
+    // Simple test script
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('Page loaded');
+      
+      const forecastBtn = document.getElementById('forecast-btn');
+      const resultDiv = document.getElementById('result');
+      
+      if (forecastBtn) {
+        forecastBtn.addEventListener('click', async function() {
+          console.log('Forecast button clicked');
+          
+          // Clear previous results
+          resultDiv.innerHTML = '<div class="alert alert-info">Processing...</div>';
+          
+          // Get input values
+          const params = {
+            turb: parseFloat(document.getElementById('turb-input').value),
+            ph: parseFloat(document.getElementById('ph-input').value),
+            temp: parseFloat(document.getElementById('temp-input').value),
+            flow: parseFloat(document.getElementById('flow-input').value),
+            inletPressure: parseFloat(document.getElementById('inlet-pressure-input').value)
+          };
+          
+          console.log('Parameters:', params);
+          
+          try {
+            // Try API call - explicitly use HTTP protocol
+            const response = await fetch('http://localhost:8000/api/predict', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                parameters: {
+                  turbidity: params.turb,
+                  ph: params.ph,
+                  temperature: params.temp,
+                  flow_rate: params.flow,
+                  inlet_pressure: params.inletPressure
+                },
+                fouling_status: "clean",
+                time_steps: 20,
+                pressure_threshold: 7.0
+              })
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              console.log('API response:', data);
+              
+              // Show chart
+              const chartSection = document.getElementById('chart-section');
+              chartSection.style.display = 'block';
+              
+              // Destroy existing chart if it exists
+              if (pressureChart) {
+                pressureChart.destroy();
+              }
+              
+              // Create new chart
+              const ctx = document.getElementById('pressureChart').getContext('2d');
+              pressureChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                  labels: Array.from({length: data.prediction_data.pressure_data.length}, (_, i) => i + 1),
+                  datasets: [{
+                    label: 'Pressure (PSIG)',
+                    data: data.prediction_data.pressure_data,
+                    borderColor: 'rgb(75, 192, 192)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                    tension: 0.1,
+                    fill: false
+                  }]
+                },
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  scales: {
+                    y: {
+                      beginAtZero: true,
+                      title: {
+                        display: true,
+                        text: 'Pressure (PSIG)'
+                      }
+                    },
+                    x: {
+                      title: {
+                        display: true,
+                        text: 'Time Step'
+                      }
+                    }
+                  },
+                  plugins: {
+                    title: {
+                      display: true,
+                      text: 'Pressure Drop Prediction'
+                    }
+                  }
+                }
+              });
+              
+              resultDiv.innerHTML = '<div class="alert alert-success">✅ Prediction successful! Chart displayed above.</div>';
+            } else {
+              // Handle HTTP error responses
+              let errorMessage = `HTTP Error: ${response.status} ${response.statusText}`;
+              try {
+                const errorData = await response.text();
+                if (errorData) {
+                  errorMessage += ` - ${errorData}`;
+                }
+              } catch (e) {
+                // Ignore error reading response body
+              }
+              throw new Error(errorMessage);
+            }
+          } catch (error) {
+            console.error('Error:', error);
+            
+            // Detailed error handling
+            let errorMessage = 'Unknown error occurred';
+            let errorType = 'danger';
+            
+            if (error.name === 'TypeError' && error.message.includes('fetch')) {
+              errorMessage = '❌ Network Error: Cannot connect to backend server. Please ensure the server is running on http://localhost:8000';
+              errorType = 'warning';
+            } else if (error.message.includes('Failed to fetch')) {
+              errorMessage = '❌ Connection Error: Backend server is not responding. Please check if the server is running.';
+              errorType = 'warning';
+            } else if (error.message.includes('HTTP Error')) {
+              errorMessage = `❌ API Error: ${error.message}`;
+              errorType = 'danger';
+            } else if (error.message.includes('JSON')) {
+              errorMessage = '❌ Data Error: Invalid response from server';
+              errorType = 'danger';
+            } else {
+              errorMessage = `❌ Error: ${error.message}`;
+              errorType = 'danger';
+            }
+            
+            resultDiv.innerHTML = `<div class="alert alert-${errorType}">${errorMessage}</div>`;
+            
+            // Hide chart section on error
+            const chartSection = document.getElementById('chart-section');
+            chartSection.style.display = 'none';
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html> 
